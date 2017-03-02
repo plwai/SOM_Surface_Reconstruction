@@ -1,0 +1,22 @@
+<application
+	name="SOM (Self Organizing Maps)"
+	acronym="SOM"
+	summary="[p]The SOM application aims at creating Self Organizing Map networks.[/p][p]This work is Jointly-developed by Prof. Dr. Siti Mariyam Shamsuddin and Dr. Shafaatunnur Hasan from UTM Big Data Centre, Skudai, Johor, Malaysia and Prof Dr. Noel Lopes from Polytechnic of Guarda, Portugal"
+	cite="If you make use of GPUMLib SOM in your work, please cite one or more of the following papers, which describe work that has been integrated in this application:[ul][li]Shafaatunnur Hasan, Siti Mariyam Shamsuddin, and Noel Lopes. [em]GPU Computing and Applications[/em], chapter Soft Computing Methods for Big Data Problems, pages 235–247. Springer Singapore, 2014.[/li][li]Shafaatunnur Hasan, Siti Mariyam Shamsuddin, and Noel Lopes. Machine learning big data framework and analytics for big data problems. [em]International Journal of Soft Computing and its Application[/em], 6(2), 2014.[/li][/ul]"
+>
+	<parameter name="Device" type="device" commandline="device" summary="Device (CPU or GPU) to be used to train the SOM network." />
+	<group name="Training Dataset">
+		<parameter name="Header line" type="bool" summary="If true the first line of the datasets (containing the caption) will be ignored" commandline="header" value="false" />
+		<parameter name="Filename" type="filename" summary="Training filename" commandline="trainfile" filter="Dataset (*.csv *.txt);;All files (*.*)" />
+		<parameter name="Samples" type="int" summary="Number of training samples to be processed. A value of 0 (zero) means all." commandline="trainsamples" minimum="0" value="0" />
+		<parameter name="Features" type="int" summary="Number of training features (variables)." commandline="features" minimum="1" />
+	</group>
+	<group name="Training configuration">
+		<group name="Map">
+			<parameter name="X" type="int" summary="X Map dimension." commandline="mapx" minimum="7" />
+			<parameter name="Y" type="int" summary="Y Map dimension." commandline="mapy" minimum="7" />
+		</group>
+		<parameter name="Iterations" type="int" summary="Number of iterations" commandline="iterations" minimum="1" />
+		<parameter name="Initial random seed" type="int" commandline="random" value="0" summary="The initial random seed. If 0 (zero) a new random seed will be obtained." />
+	</group>
+</application>
