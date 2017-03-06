@@ -41,6 +41,11 @@
 #include "../../memory/CudaArray.h"
 
 namespace GPUMLib {
+	struct Features {
+		cudafloat x;
+		cudafloat y;
+		cudafloat z;
+	};
 
 	class SOMwidget : public AlgorithmWidget {
 		Q_OBJECT
@@ -53,18 +58,18 @@ namespace GPUMLib {
 		virtual void Run(ParameterValues & parameterValues, LogHTML & summaryLog, LogHTML & log) override;
 		virtual void LogConfiguration(LogHTML & log, ParameterValues & parameterValues) override;
 
-		int TrainCPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log);
+		int TrainCPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<Features> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log);
 		int TrainGPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log);
 
-		void FindBestMatchingUnit(int vector, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode);
+		void FindBestMatchingUnit(int vector, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<Features> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode);
 
-		cudafloat CalculateDistance(int input, int wx, int wy, CudaMatrix<cudafloat> & inputData, CudaMatrix3D<cudafloat> & weights);
+		cudafloat CalculateDistance(int input, int wx, int wy, int wz, CudaMatrix<cudafloat> & inputData, CudaMatrix3D<Features> & weights);
 
-		void InitWeights(CudaMatrix3D<cudafloat> & weights);
+		void InitWeights(CudaMatrix3D<Features> & weights);
 
-		void NormalizeWeights(CudaMatrix3D<cudafloat> & weights);
+		void NormalizeWeights(CudaMatrix3D<Features> & weights);
 
-		void WriteWeights(CudaMatrix3D<cudafloat> & weights, char * weightsOutput);
+		void WriteWeights(CudaMatrix3D<Features> & weights, char * weightsOutput);
 
 		void ShowMapView(LogHTML & log, CudaMatrix<int> & mapView, char * mapOutput);
 

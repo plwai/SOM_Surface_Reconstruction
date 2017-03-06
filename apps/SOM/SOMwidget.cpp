@@ -123,6 +123,7 @@ namespace GPUMLib {
 		int vectors = dsTrain->NumberOfSamples();
 		int mapx = parameterValues.GetIntParameter("mapx");
 		int mapy = parameterValues.GetIntParameter("mapy");
+		int mapz = 30; // temporary
 
 		CudaMatrix<cudafloat> inputs(dsTrain->GetInputs());
 
@@ -130,7 +131,7 @@ namespace GPUMLib {
 		for (int i = 0; i < vectors; i++) targets[i] = (int)dsTrain->GetTargets()(i, 0);
 		if (DeviceIsGPU()) targets.UpdateDevice();
 
-		CudaMatrix3D<cudafloat> weights(features, mapx, mapy);
+		CudaMatrix3D<Features> weights(features, mapx, mapy);
 		InitWeights(weights);
 
 		CudaMatrix<int> mapView(mapy, mapx);
@@ -164,11 +165,11 @@ namespace GPUMLib {
 			log.AppendLine();
 			log.AppendLine("Map:");
 
-			ShowMapView(log, mapView, MAP_OUTPUT_CPU);
+			//ShowMapView(log, mapView, MAP_OUTPUT_CPU);
 
 			WriteWeights(weights, WEIGHTS_OUTPUT_CPU);
 		} else {
-			clock_t initialTime = clock();
+			/*clock_t initialTime = clock();
 			int iteration = TrainGPU(progress, maxIterations, inputs, targets, weights, mapView, winNode, mapRadius, timeConstant, summaryLog, log);
 			cudaThreadSynchronize();
 			double elapsedTime = (clock() - initialTime) / 1000.0;
@@ -185,7 +186,7 @@ namespace GPUMLib {
 
 				weights.UpdateHost();
 				WriteWeights(weights, WEIGHTS_OUTPUT_GPU);
-			}
+			}*/
 		}
 
 		progress.End();
@@ -193,7 +194,7 @@ namespace GPUMLib {
 		summaryLog.Append(log.ToString());
 	}
 
-	int SOMwidget::TrainCPU(ProgressInfo & progress, int iteration, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log) {
+	int SOMwidget::TrainCPU(ProgressInfo & progress, int iteration, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<Features> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log) {
 		cudafloat learningRate = GPUMLIB_SOM_INITIAL_LEARNING_RATE;
 
 		int features = (int)inputData.Columns();
@@ -214,20 +215,27 @@ namespace GPUMLib {
 
 				for (int y = 0; y < mapy; y++) {
 					for (int x = 0; x < mapx; x++) {
-						int win = winNode[vector];
-						int winx = win % mapx;
-						int winy = win / mapx;
+						for (int z = 0; z < mapx; z++) {
+							int win = winNode[vector];
+							int winx = win % mapx;
+							int winy = (win % (mapx * mapy)) / mapx;
+							int winz = (win / (mapx * mapy));
 
-						cudafloat dx = winx - x;
-						cudafloat dy = winy - y;
+							cudafloat dx = winx - x;
+							cudafloat dy = winy - y;
+							cudafloat dz = winz - z;
 
-						cudafloat distanceFromNode = dx * dx + dy * dy;
+							cudafloat distanceFromNode = sqrt(dx * dx + dy * dy + dz * dz);
 
-						if (distanceFromNode < squareNeighbourhoodRadius) {
-							cudafloat m_dInfluence = exp(-(distanceFromNode) / (2 * squareNeighbourhoodRadius));
+							//if (distanceFromNode < squareNeighbourhoodRadius) {
+							if (distanceFromNode < neighbourhoodRadius) {
+								//cudafloat m_dInfluence = exp(-(distanceFromNode) / (2 * squareNeighbourhoodRadius));
+								cudafloat m_dInfluence = exp(-(distanceFromNode) / (2 * neighbourhoodRadius));
 
-							for (int k = 0; k < features; k++) {
-								weights(k, x, y) += (cudafloat)(learningRate * m_dInfluence * (inputData(vector, k) - weights(k, x, y)));
+								weights(z, x, y).x += (cudafloat)(learningRate * m_dInfluence * (inputData(vector, 0) - weights(z, x, y).x));
+								weights(z, x, y).y += (cudafloat)(learningRate * m_dInfluence * (inputData(vector, 0) - weights(z, x, y).y));
+								weights(z, x, y).z += (cudafloat)(learningRate * m_dInfluence * (inputData(vector, 0) - weights(z, x, y).z));
+								
 							}
 						}
 					}
@@ -250,7 +258,7 @@ namespace GPUMLib {
 		return QString("A CUDA <b>error</b> has occurred during training (iteration %1): %2").arg(iteration).arg(cudaGetErrorString(error));
 	}
 
-	int SOMwidget::TrainGPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log) {
+	/*int SOMwidget::TrainGPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log) {
 		cudafloat learningRate = GPUMLIB_SOM_INITIAL_LEARNING_RATE;
 
 		int features = (int)inputData.Columns();
@@ -329,50 +337,64 @@ namespace GPUMLib {
 		}
 
 		return currentIteration;
-	}
+	}*/
 
-	void SOMwidget::FindBestMatchingUnit(int vector, CudaMatrix<cudafloat> & inputData, CudaArray<int> & target, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode) {
+	void SOMwidget::FindBestMatchingUnit(int vector, CudaMatrix<cudafloat> & inputData, CudaArray<int> & target, CudaMatrix3D<Features> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode) {
 		cudafloat lowestDistance = MAX_CUDAFLOAT;
 
 		int winx = -1;
 		int winy = -1;
+		int winz = -1;
 
 		int rows = (int)mapView.Rows();
 		int columns = (int)mapView.Columns();
 
 		for (int y = 0; y < rows; y++) {
 			for (int x = 0; x < columns; x++) {
-				cudafloat distance = CalculateDistance(vector, x, y, inputData, weights);
+				for (int z = 0; z < 30; z++) {
+					cudafloat distance = CalculateDistance(vector, x, y, z, inputData, weights);
 
-				if (distance < lowestDistance) {
-					lowestDistance = distance;
-					winx = x;
-					winy = y;
+					if (distance < lowestDistance) {
+						lowestDistance = distance;
+						winx = x;
+						winy = y;
+						winz = z;
+					}
 				}
 			}
 		}
 
-		winNode[vector] = winy * columns + winx;
+		winNode[vector] = winy * columns + winx + winz * columns * rows;
 		mapView(winy, winx) = target[vector];
 	}
 
-	cudafloat SOMwidget::CalculateDistance(int input, int wx, int wy, CudaMatrix<cudafloat> & inputData, CudaMatrix3D<cudafloat> & weights) {
+	cudafloat SOMwidget::CalculateDistance(int input, int wx, int wy, int wz, CudaMatrix<cudafloat> & inputData, CudaMatrix3D<Features> & weights) {
 		cudafloat distance = 0.0f;
 
 		int features = (int)inputData.Columns();
-		for (int f = 0; f < features; f++) {
-			cudafloat d = inputData(input, f) - weights(f, wx, wy);
-			distance += d * d;
-		}
+	
+		cudafloat d = inputData(input, 0) - weights(wz, wx, wy).x;
+		distance += d * d;
+
+		cudafloat d = inputData(input, 1) - weights(wz, wx, wy).y;
+		distance += d * d;
+
+		cudafloat d = inputData(input, 2) - weights(wz, wx, wy).z;
+		distance += d * d;
 
 		return sqrt(distance);
 	}
 
-	void SOMwidget::InitWeights(CudaMatrix3D<cudafloat> & weights) {
+	void SOMwidget::InitWeights(CudaMatrix3D<Features> & weights) {
+		Features feature;
+
 		for (size_t z = 0; z < weights.DimZ(); z++) { // mapy
 			for (size_t y = 0; y < weights.DimY(); y++) { // mapx
-				for (size_t x = 0; x < weights.DimX(); x++) { // features
-					weights(x, y, z) = (cudafloat)rand() / RAND_MAX;
+				for (size_t x = 0; x < weights.DimX(); x++) { // mapz
+					feature.x = (cudafloat)rand() / RAND_MAX;
+					feature.y = (cudafloat)rand() / RAND_MAX;
+					feature.z = (cudafloat)rand() / RAND_MAX;
+					weights(x, y, z) = feature;
 				}
 			}
 		}
@@ -382,32 +404,40 @@ namespace GPUMLib {
 		if (DeviceIsGPU()) weights.UpdateDevice();
 	}
 
-	void SOMwidget::NormalizeWeights(CudaMatrix3D<cudafloat> & weights) {
+	void SOMwidget::NormalizeWeights(CudaMatrix3D<Features> & weights) {
 		for (size_t z = 0; z < weights.DimZ(); z++) { // mapy
 			for (size_t y = 0; y < weights.DimY(); y++) { // mapx
-				double norm = 0.0;
+				for (size_t x = 0; x < weights.DimY(); x++) { // mapz
+					double norm = 0.0;
+					Features current_weight;
 
-				for (size_t x = 0; x < weights.DimX(); x++) { // features
-					cudafloat current_weight = weights(x, y, z);
-					norm += current_weight * current_weight;
-				}
+					current_weight = weights(x, y, z);
+					norm += current_weight.x * current_weight.x;
+					norm += current_weight.y * current_weight.y;
+					norm += current_weight.z * current_weight.z;
 
-				norm = 1.0 / (sqrt(norm));
+					norm = 1.0 / (sqrt(norm));
 
-				for (size_t x = 0; x < weights.DimX(); x++) {
-					weights(x, y, z) *= (cudafloat)norm;
+					current_weight.x *= (cudafloat)norm;
+					current_weight.y *= (cudafloat)norm;
+					current_weight.z *= (cudafloat)norm;
+
+					weights(x, y, z) = current_weight;
+
 				}
 			}
 		}
 	}
 
-	void SOMwidget::WriteWeights(CudaMatrix3D<cudafloat> & weights, char * weightsOutput) {
+	void SOMwidget::WriteWeights(CudaMatrix3D<Features> & weights, char * weightsOutput) {
 		FILE *fw = fopen(weightsOutput, "w");
 
 		for (size_t z = 0; z < weights.DimZ(); z++) { // mapy
 			for (size_t y = 0; y < weights.DimY(); y++) { // mapx
-				for (size_t x = 0; x < weights.DimX(); x++) { // features
-					fprintf(fw, "%.4lf ", weights(x, y, z));
+				for (size_t x = 0; x < weights.DimX(); x++) { // mapz
+					fprintf(fw, "%.4lf ", weights(x, y, z).x);
+					fprintf(fw, "%.4lf ", weights(x, y, z).y);
+					fprintf(fw, "%.4lf ", weights(x, y, z).z);
 				}
 				fprintf(fw, "\n");
 			}
