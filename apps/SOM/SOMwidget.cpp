@@ -134,10 +134,12 @@ namespace GPUMLib {
 		CudaMatrix3D<Features> weights(features, mapx, mapy);
 		InitWeights(weights);
 
-		CudaMatrix<int> mapView(mapy, mapx);
-		for (int y = 0; y < mapy; y++) {
-			for (int x = 0; x < mapx; x++) {
-				mapView(y, x) = 0;
+		CudaMatrix3D<int> mapView(mapz, mapy, mapx);
+		for (int z = 0; z < mapz; z++) {
+			for (int y = 0; y < mapy; y++) {
+				for (int x = 0; x < mapx; x++) {
+					mapView(z, y, x) = 0;
+				}
 			}
 		}
 
@@ -165,7 +167,7 @@ namespace GPUMLib {
 			log.AppendLine();
 			log.AppendLine("Map:");
 
-			//ShowMapView(log, mapView, MAP_OUTPUT_CPU);
+			ShowMapView(log, mapView, MAP_OUTPUT_CPU);
 
 			WriteWeights(weights, WEIGHTS_OUTPUT_CPU);
 		} else {
@@ -194,13 +196,14 @@ namespace GPUMLib {
 		summaryLog.Append(log.ToString());
 	}
 
-	int SOMwidget::TrainCPU(ProgressInfo & progress, int iteration, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<Features> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log) {
+	int SOMwidget::TrainCPU(ProgressInfo & progress, int iteration, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<Features> & weights, CudaMatrix3D<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log) {
 		cudafloat learningRate = GPUMLIB_SOM_INITIAL_LEARNING_RATE;
 
 		int features = (int)inputData.Columns();
 		int samples = (int)inputData.Rows();
-		int mapx = (int)mapView.Columns();
-		int mapy = (int)mapView.Rows();
+		int mapx = (int)mapView.DimX();
+		int mapy = (int)mapView.DimY();
+		int mapz = (int)mapView.DimZ();
 
 		int currentIteration = 0;
 
@@ -339,19 +342,20 @@ namespace GPUMLib {
 		return currentIteration;
 	}*/
 
-	void SOMwidget::FindBestMatchingUnit(int vector, CudaMatrix<cudafloat> & inputData, CudaArray<int> & target, CudaMatrix3D<Features> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode) {
+	void SOMwidget::FindBestMatchingUnit(int vector, CudaMatrix<cudafloat> & inputData, CudaArray<int> & target, CudaMatrix3D<Features> & weights, CudaMatrix3D<int> & mapView, CudaArray<int> & winNode) {
 		cudafloat lowestDistance = MAX_CUDAFLOAT;
 
 		int winx = -1;
 		int winy = -1;
 		int winz = -1;
 
-		int rows = (int)mapView.Rows();
-		int columns = (int)mapView.Columns();
+		int rows = (int)mapView.DimY();
+		int columns = (int)mapView.DimX();
+		int depth = (int)mapView.DimZ();
 
 		for (int y = 0; y < rows; y++) {
 			for (int x = 0; x < columns; x++) {
-				for (int z = 0; z < 30; z++) {
+				for (int z = 0; z < depth; z++) {
 					cudafloat distance = CalculateDistance(vector, x, y, z, inputData, weights);
 
 					if (distance < lowestDistance) {
@@ -365,7 +369,7 @@ namespace GPUMLib {
 		}
 
 		winNode[vector] = winy * columns + winx + winz * columns * rows;
-		mapView(winy, winx) = target[vector];
+		mapView(winz, winy, winx) = target[vector];
 	}
 
 	cudafloat SOMwidget::CalculateDistance(int input, int wx, int wy, int wz, CudaMatrix<cudafloat> & inputData, CudaMatrix3D<Features> & weights) {
@@ -446,23 +450,25 @@ namespace GPUMLib {
 		fclose(fw);
 	}
 
-	void SOMwidget::ShowMapView(LogHTML & log, CudaMatrix<int> & mapView, char * mapOutput) {
+	void SOMwidget::ShowMapView(LogHTML & log, CudaMatrix3D<int> & mapView, char * mapOutput) {
 		FILE *fs = fopen(mapOutput, "w");
 
-		log.BeginTable(0);
+		for (size_t k = 0; k < mapView.DimZ(); k++) {
+			log.BeginTable(0);
 
-		for (size_t i = 0; i < mapView.Rows(); i++) {
-			log.BeginRow();
+			for (size_t i = 0; i < mapView.DimY(); i++) {
+				log.BeginRow();
 
-			for (size_t j = 0; j < mapView.Columns(); j++) {
-				log.AddColumn(mapView(i, j));
-				fprintf(fs, "%d ", mapView(i, j));
+				for (size_t j = 0; j < mapView.DimX(); j++) {
+					log.AddColumn(mapView(k, i, j));
+					fprintf(fs, "%d ", mapView(k, i, j));
+				}
+				log.EndRow();
+				fprintf(fs, "\n");
 			}
-			log.EndRow();
-			fprintf(fs, "\n");
-		}
 
-		log.EndTable();
+			log.EndTable();
+		}
 	}
 
 } // namespace GPUMLib
