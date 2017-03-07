@@ -71,7 +71,7 @@ namespace GPUMLib {
 
 		void WriteWeights(CudaMatrix3D<Features> & weights, char * weightsOutput);
 
-		void ShowMapView(LogHTML & log, CudaMatrix<int> & mapView, char * mapOutput);
+		void ShowMapView(LogHTML & log, CudaMatrix3D<int> & mapView, char * mapOutput);
 
 	};
 
