@@ -310,7 +310,7 @@ namespace GPUMLib {
 					return 0;
 				}
 
-				error = NormalizeWeightsSOM(gridMap, threadsFeatures, mapx, mapy, features, weights.DevicePointer());
+				//error = NormalizeWeightsSOM(gridMap, threadsFeatures, mapx, mapy, features, weights.DevicePointer());
 
 				if (error != cudaSuccess) {
 					QString e = CudaError(currentIteration, error);
@@ -377,7 +377,7 @@ namespace GPUMLib {
 			}
 		}
 
-		NormalizeWeights(weights);
+		//NormalizeWeights(weights);
 
 		if (DeviceIsGPU()) weights.UpdateDevice();
 	}
