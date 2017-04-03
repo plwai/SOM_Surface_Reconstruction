@@ -5,13 +5,21 @@
 	cite="If you make use of GPUMLib SOM in your work, please cite one or more of the following papers, which describe work that has been integrated in this application:[ul][li]Shafaatunnur Hasan, Siti Mariyam Shamsuddin, and Noel Lopes. [em]GPU Computing and Applications[/em], chapter Soft Computing Methods for Big Data Problems, pages 235–247. Springer Singapore, 2014.[/li][li]Shafaatunnur Hasan, Siti Mariyam Shamsuddin, and Noel Lopes. Machine learning big data framework and analytics for big data problems. [em]International Journal of Soft Computing and its Application[/em], 6(2), 2014.[/li][/ul]"
 >
 	<parameter name="Device" type="device" commandline="device" summary="Device (CPU or GPU) to be used to train the SOM network." />
+	<parameter name="Tools" type="list" summary="Desired output (clustering or 3D surface reconstruction)" commandline="tools">
+		<option name="Data Clustering" value="1"/>
+		<option name="3D Surface Reconstruction" value="2"/>
+	</parameter>
 	<group name="Training Dataset">
 		<parameter name="Header line" type="bool" summary="If true the first line of the datasets (containing the caption) will be ignored" commandline="header" value="false" />
-		<parameter name="Filename" type="filename" summary="Training filename" commandline="trainfile" filter="Dataset (*.csv *.txt);;All files (*.*)" />
+		<parameter name="Filename" type="filename" summary="Training filename" commandline="trainfile" filter="Dataset (*.csv *.txt);;Dataset3D (*.ply);;All files (*.*)" />
 		<parameter name="Samples" type="int" summary="Number of training samples to be processed. A value of 0 (zero) means all." commandline="trainsamples" minimum="0" value="0" />
 		<parameter name="Features" type="int" summary="Number of training features (variables)." commandline="features" minimum="1" />
 	</group>
 	<group name="Training configuration">
+		<parameter name="Map Type" type="list" summary="SOM layer algorithm" commandline="maptype">
+			<option name="Basic Map" value="1"/>
+			<option name="Dual Layer Map (For Surface Reconstruction Only!)" value="2"/>
+		</parameter>
 		<group name="Map">
 			<parameter name="X" type="int" summary="X Map dimension." commandline="mapx" minimum="7" />
 			<parameter name="Y" type="int" summary="Y Map dimension." commandline="mapy" minimum="7" />

@@ -33,6 +33,7 @@
 #include "SOMwidget.h"
 
 #include "../common/dataset.h"
+#include "../common/dataset3D.h"
 
 #include "../../cuda/reduction/reduction.h"
 #include "../../cuda/som/som_kernels.h"
@@ -105,13 +106,20 @@ namespace GPUMLib {
 
 		int maxIterations = parameterValues.GetIntParameter("iterations");
 
+		int tools = parameterValues.GetIntParameter("tools");
+
 		ProgressInfo progress(this, "SOM - Training network", 0, maxIterations);
 		progress.Update("Loading datasets");
 
 		std::unique_ptr<Dataset> dsTrain;
-
+		
 		try {
-			dsTrain = std::move(std::unique_ptr<Dataset>(new Dataset(trainfile, hasHeader, false, features, 1, trainSamples, log)));
+			if (tools == 1) {
+				dsTrain = std::move(std::unique_ptr<Dataset>(new Dataset(trainfile, hasHeader, false, features, 1, trainSamples, log)));
+			}
+			else {
+				dsTrain = std::move(std::unique_ptr<Dataset3D>(new Dataset3D(trainfile, hasHeader, false, features, 1, trainSamples, log)));
+			}
 		} catch (QString & error) {
 			QMessageBox(QMessageBox::Warning, "Warning", QString("Error loading the training dataset. ") + error).exec();
 			return;
@@ -123,6 +131,7 @@ namespace GPUMLib {
 		int vectors = dsTrain->NumberOfSamples();
 		int mapx = parameterValues.GetIntParameter("mapx");
 		int mapy = parameterValues.GetIntParameter("mapy");
+		int mapz = parameterValues.GetIntParameter("maptype");
 
 		CudaMatrix<cudafloat> inputs(dsTrain->GetInputs());
 
@@ -130,10 +139,10 @@ namespace GPUMLib {
 		for (int i = 0; i < vectors; i++) targets[i] = (int)dsTrain->GetTargets()(i, 0);
 		if (DeviceIsGPU()) targets.UpdateDevice();
 
-		CudaMatrix3D<cudafloat> weights(features, mapx, mapy);
+		CudaMatrix3D<cudafloat> weights(features, mapx, mapy * mapz);
 		InitWeights(weights);
 
-		CudaMatrix<int> mapView(mapy, mapx);
+		CudaMatrix<int> mapView(mapy * mapz, mapx);
 		for (int y = 0; y < mapy; y++) {
 			for (int x = 0; x < mapx; x++) {
 				mapView(y, x) = 0;
@@ -148,7 +157,7 @@ namespace GPUMLib {
 			winNode.UpdateDevice();
 		}
 
-		cudafloat mapRadius = std::max(mapx, mapy) / cudafloat(2.0);
+		cudafloat mapRadius = std::max(std::max(mapx, mapy / mapz), mapz) / cudafloat(2.0);
 		cudafloat timeConstant = maxIterations / std::log(mapRadius);
 
 		progress.Update("Training network ...");
@@ -169,7 +178,7 @@ namespace GPUMLib {
 			WriteWeights(weights, WEIGHTS_OUTPUT_CPU);
 		} else {
 			clock_t initialTime = clock();
-			int iteration = TrainGPU(progress, maxIterations, inputs, targets, weights, mapView, winNode, mapRadius, timeConstant, summaryLog, log);
+			int iteration = TrainGPU(progress, maxIterations, inputs, targets, weights, mapView, winNode, mapRadius, timeConstant, summaryLog, log, tools, mapz);
 			cudaThreadSynchronize();
 			double elapsedTime = (clock() - initialTime) / 1000.0;
 
@@ -250,7 +259,7 @@ namespace GPUMLib {
 		return QString("A CUDA <b>error</b> has occurred during training (iteration %1): %2").arg(iteration).arg(cudaGetErrorString(error));
 	}
 
-	int SOMwidget::TrainGPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log) {
+	int SOMwidget::TrainGPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log, int & tools, int & mapType) {
 		cudafloat learningRate = GPUMLIB_SOM_INITIAL_LEARNING_RATE;
 
 		int features = (int)inputData.Columns();
@@ -299,7 +308,12 @@ namespace GPUMLib {
 					return 0;
 				}
 
-				error = UpdateWeightsSOM(blockSizeUpdateWeights, bmu.DevicePointer(), mapView.DevicePointer(), mapx, mapy, inputData.DevicePointer(), vector, features, targets[vector], squareNeighbourhoodRadius, weights.DevicePointer(), learningRate);
+				if (mapType == 1) {
+					error = UpdateWeightsSOM(blockSizeUpdateWeights, bmu.DevicePointer(), mapView.DevicePointer(), mapx, mapy, inputData.DevicePointer(), vector, features, targets[vector], squareNeighbourhoodRadius, weights.DevicePointer(), learningRate);
+				}
+				else {
+					error = UpdateWeightsSOMDual(blockSizeUpdateWeights, bmu.DevicePointer(), mapView.DevicePointer(), mapx, mapy, inputData.DevicePointer(), vector, features, targets[vector], squareNeighbourhoodRadius, weights.DevicePointer(), learningRate);
+				}
 
 
 				if (error != cudaSuccess) {
@@ -310,7 +324,9 @@ namespace GPUMLib {
 					return 0;
 				}
 
-				error = NormalizeWeightsSOM(gridMap, threadsFeatures, mapx, mapy, features, weights.DevicePointer());
+				if (tools == 1) {
+					error = NormalizeWeightsSOM(gridMap, threadsFeatures, mapx, mapy, features, weights.DevicePointer());
+				}
 
 				if (error != cudaSuccess) {
 					QString e = CudaError(currentIteration, error);
@@ -377,7 +393,7 @@ namespace GPUMLib {
 			}
 		}
 
-		//NormalizeWeights(weights);
+		NormalizeWeights(weights);
 
 		if (DeviceIsGPU()) weights.UpdateDevice();
 	}
