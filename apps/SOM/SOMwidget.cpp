@@ -50,6 +50,8 @@
 #define MAP_OUTPUT_CPU "map_cpu.txt"
 #define MAP_OUTPUT_GPU "map_gpu.txt"
 
+#define PLY_OUTPUT_GPU "3D_gpu.ply"
+
 namespace GPUMLib {
 
 	void SOMwidget::LogConfiguration(LogHTML & log, ParameterValues & parameterValues) {
@@ -194,6 +196,11 @@ namespace GPUMLib {
 
 				weights.UpdateHost();
 				WriteWeights(weights, WEIGHTS_OUTPUT_GPU);
+
+				if (tools == 2) {
+					weights.UpdateHost();
+					WritePLYFile(weights, mapView, mapz, PLY_OUTPUT_GPU);
+				}
 			}
 		}
 
@@ -449,6 +456,105 @@ namespace GPUMLib {
 		}
 
 		log.EndTable();
+
+		fclose(fs);
+	}
+
+	void SOMwidget::WritePLYFile(CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, int mapz, char * plyOutput) {
+		FILE *fs = fopen(plyOutput, "w");
+
+		std::string plyTemplate = "";
+		int vertexNum, faceNum;
+
+		int mapx = (int)mapView.Columns();
+		int mapy = (int)mapView.Rows();
+
+		// Prepare header template
+		vertexNum = mapy * mapx;
+
+		if (mapz == 1) {
+			// Basic 2D Map
+			faceNum = (mapy - 1) * (mapy - 1) * 2;
+		}
+		else {
+			// Dual Layer Map
+			faceNum = (4 * ((mapy / 2) - 1)) + (mapx - 1) * 2 * mapy;
+		}
+
+		plyTemplate += "ply\nformat ascii 1.0\nelement vertex ";
+		plyTemplate += std::to_string(vertexNum);
+		plyTemplate += "\nproperty float x\nproperty float y\nproperty float z\nelement face ";
+		plyTemplate += std::to_string(faceNum);
+		plyTemplate += "\nproperty list uchar int vertex_indices\nend_header\n";
+
+		// Write header 
+		fprintf(fs, plyTemplate.c_str());
+
+		// Write points
+		for (size_t z = 0; z < weights.DimZ(); z++) { // mapy
+			for (size_t y = 0; y < weights.DimY(); y++) { // mapx
+				for (size_t x = 0; x < weights.DimX(); x++) { // features
+					fprintf(fs, "%.4lf ", weights(x, y, z));
+				}
+				fprintf(fs, "\n");
+			}
+		}
+
+		// Write surface connection
+		if (mapz == 1) {
+			// Basic 2D Map
+
+			// Center Connection
+			for (int i = 0; i < mapy - 1; i++) {
+				for (int j = 0; j < mapx - 1; j++) {
+					fprintf(fs, "3 %d %d %d\n", getMapLocation(i, j, mapx), getMapLocation(i, j + 1, mapx), getMapLocation(i + 1, j + 1, mapx));
+					fprintf(fs, "3 %d %d %d\n", getMapLocation(i, j, mapx), getMapLocation(i + 1, j + 1, mapx), getMapLocation(i + 1, j, mapx));
+				}
+			}
+		}
+		else {
+			// Dual Layer Map
+
+			// Center Connection Layer 1
+			for (int i = 0; i < mapy / 2 - 1; i++) {
+				for (int j = 0; j < mapx - 1; j++) {
+					fprintf(fs, "3 %d %d %d\n", getMapLocation(i, j + 1, mapx), getMapLocation(i, j, mapx), getMapLocation(i + 1, j + 1, mapx));
+					fprintf(fs, "3 %d %d %d\n", getMapLocation(i + 1, j + 1, mapx), getMapLocation(i, j, mapx), getMapLocation(i + 1, j, mapx));
+				}
+			}
+
+			// Center Connection Layer 2
+			for (int i = mapy / 2; i < mapy - 1; i++) {
+				for (int j = 0; j < mapx - 1; j++) {
+					fprintf(fs, "3 %d %d %d\n", getMapLocation(i, j, mapx), getMapLocation(i, j + 1, mapx), getMapLocation(i + 1, j + 1, mapx));
+					fprintf(fs, "3 %d %d %d\n", getMapLocation(i, j, mapx), getMapLocation(i + 1, j + 1, mapx), getMapLocation(i + 1, j, mapx));
+				}
+			}
+
+			// Sides Connection ( Top and Bottom )
+			for (int j = 0; j < mapx - 1; j++) {
+				fprintf(fs, "3 %d %d %d\n", getMapLocation(mapy / 2, j + 1, mapx), getMapLocation(mapy / 2, j, mapx), getMapLocation(0, j + 1, mapx));
+				fprintf(fs, "3 %d %d %d\n", getMapLocation(0, j, mapx), getMapLocation(0, j + 1, mapx), getMapLocation(mapy / 2, j, mapx));
+
+				fprintf(fs, "3 %d %d %d\n", getMapLocation(mapy / 2 - 1, j + 1, mapx), getMapLocation(mapy / 2 - 1, j, mapx), getMapLocation(mapy - 1, j + 1, mapx));
+				fprintf(fs, "3 %d %d %d\n", getMapLocation(mapy - 1, j, mapx), getMapLocation(mapy - 1, j + 1, mapx), getMapLocation(mapy / 2 - 1, j, mapx));
+			}
+
+			// Sides Connection ( Left and Right )
+			for (int j = 0; j < mapy / 2 - 1; j++) {
+				fprintf(fs, "3 %d %d %d\n", getMapLocation(j, 0, mapx), getMapLocation(j + (mapy / 2), 0, mapx), getMapLocation(j + 1, 0, mapx));
+				fprintf(fs, "3 %d %d %d\n", getMapLocation(j + (mapy / 2), 0, mapx), getMapLocation(j + (mapy / 2) + 1, 0, mapx), getMapLocation(j + 1, 0, mapx));
+
+				fprintf(fs, "3 %d %d %d\n", getMapLocation(j + (mapy / 2) + 1, mapx - 1, mapx), getMapLocation(j + (mapy / 2), mapx - 1, mapx), getMapLocation(j, mapx - 1, mapx));
+				fprintf(fs, "3 %d %d %d\n", getMapLocation(j, mapx - 1, mapx), getMapLocation(j + 1, mapx - 1, mapx), getMapLocation(j + (mapy / 2) + 1, mapx - 1, mapx));
+			}
+		}
+
+		fclose(fs);
+	}
+
+	int SOMwidget::getMapLocation(int row, int col, int mapx) {
+		return row * mapx + col;
 	}
 
 } // namespace GPUMLib

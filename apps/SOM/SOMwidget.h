@@ -68,6 +68,9 @@ namespace GPUMLib {
 
 		void ShowMapView(LogHTML & log, CudaMatrix<int> & mapView, char * mapOutput);
 
+		void WritePLYFile(CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, int mapz, char * plyOutput);
+
+		int getMapLocation(int row, int col, int mapx);
 	};
 
 } // namespace GPUMLib

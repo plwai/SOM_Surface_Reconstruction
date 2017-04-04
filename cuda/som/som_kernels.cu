@@ -105,7 +105,6 @@ __global__ void UpdateWeightsSOMDualkernel(int * bmu, int * mapView, int mapx, i
 	__shared__ int winy;
 
 	if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-		//winx = *bmu % mapx + ((int)(winy / mapy) * mapx);
 		winx = *bmu % mapx;
 		winy = *bmu / mapx;
 		mapView[*bmu] = target;
