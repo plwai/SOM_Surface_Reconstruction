@@ -50,6 +50,7 @@
 #define MAP_OUTPUT_CPU "map_cpu.txt"
 #define MAP_OUTPUT_GPU "map_gpu.txt"
 
+#define PLY_OUTPUT_CPU "3D_cpu.ply"
 #define PLY_OUTPUT_GPU "3D_gpu.ply"
 
 namespace GPUMLib {
@@ -166,7 +167,7 @@ namespace GPUMLib {
 
 		if (DeviceIsCPU()) {
 			clock_t initialTime = clock();
-			int iteration = TrainCPU(progress, maxIterations, inputs, targets, weights, mapView, winNode, mapRadius, timeConstant, summaryLog, log);
+			int iteration = TrainCPU(progress, maxIterations, inputs, targets, weights, mapView, winNode, mapRadius, timeConstant, summaryLog, log, tools, mapz);
 			double elapsedTime = (clock() - initialTime) / 1000.0;
 
 			summaryLog.AppendParagraph(QString("Training complete (%1 iterations).").arg(iteration));
@@ -178,6 +179,11 @@ namespace GPUMLib {
 			ShowMapView(log, mapView, MAP_OUTPUT_CPU);
 
 			WriteWeights(weights, WEIGHTS_OUTPUT_CPU);
+
+			if (tools == 2) {
+				WritePLYFile(weights, mapView, mapz, PLY_OUTPUT_CPU);
+			}
+
 		} else {
 			clock_t initialTime = clock();
 			int iteration = TrainGPU(progress, maxIterations, inputs, targets, weights, mapView, winNode, mapRadius, timeConstant, summaryLog, log, tools, mapz);
@@ -209,7 +215,7 @@ namespace GPUMLib {
 		summaryLog.Append(log.ToString());
 	}
 
-	int SOMwidget::TrainCPU(ProgressInfo & progress, int iteration, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log) {
+	int SOMwidget::TrainCPU(ProgressInfo & progress, int iteration, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log, int & tools, int & mapType) {
 		cudafloat learningRate = GPUMLIB_SOM_INITIAL_LEARNING_RATE;
 
 		int features = (int)inputData.Columns();
@@ -228,22 +234,101 @@ namespace GPUMLib {
 			for (int vector = 0; vector < samples; vector++) {
 				FindBestMatchingUnit(vector, inputData, targets, weights, mapView, winNode);
 
-				for (int y = 0; y < mapy; y++) {
-					for (int x = 0; x < mapx; x++) {
-						int win = winNode[vector];
-						int winx = win % mapx;
-						int winy = win / mapx;
+				int win = winNode[vector];
+				int winx = win % mapx;
+				int winy = win / mapx;
 
-						cudafloat dx = winx - x;
-						cudafloat dy = winy - y;
+				if (mapType == 1) {
+					// Basic Map
+					for (int y = 0; y < mapy; y++) {
+						for (int x = 0; x < mapx; x++) {
+							
 
-						cudafloat distanceFromNode = dx * dx + dy * dy;
+							cudafloat dx = winx - x;
+							cudafloat dy = winy - y;
 
-						if (distanceFromNode < squareNeighbourhoodRadius) {
-							cudafloat m_dInfluence = exp(-(distanceFromNode) / (2 * squareNeighbourhoodRadius));
+							cudafloat distanceFromNode = dx * dx + dy * dy;
 
-							for (int k = 0; k < features; k++) {
-								weights(k, x, y) += (cudafloat)(learningRate * m_dInfluence * (inputData(vector, k) - weights(k, x, y)));
+							if (distanceFromNode < squareNeighbourhoodRadius) {
+								cudafloat m_dInfluence = exp(-(distanceFromNode) / (2 * squareNeighbourhoodRadius));
+
+								for (int k = 0; k < features; k++) {
+									weights(k, x, y) += (cudafloat)(learningRate * m_dInfluence * (inputData(vector, k) - weights(k, x, y)));
+								}
+							}
+						}
+					}
+				}
+				else {
+					// Dual Layer Map
+					for (int y = 0; y < mapy; y++) {
+						int tempY = y >= (mapy / 2) ? y - (mapy / 2) : y;
+						int tempwinY = winy >= (mapy / 2) ? winy - (mapy / 2) : winy;
+
+						cudafloat dz = abs((int)(winy / (mapy / 2)) - (int)(y / (mapy / 2)));
+						
+						cudafloat dy = 0;
+						cudafloat leftDist = 0;
+						cudafloat rightDist = 0;
+						cudafloat topDist = 0;
+						cudafloat botDist = 0;
+
+						if (dz != 0) {
+							// 4 direction distance
+							// left
+							leftDist = (tempwinY - tempY) * (tempwinY - tempY);
+
+							// right
+							rightDist = leftDist;
+
+							// top
+							topDist = ((tempY + tempwinY + 1) * (tempY + tempwinY + 1));
+
+							// bottom
+							botDist = ((((mapy / 2) - tempY) + ((mapy / 2) - tempwinY - 1)) * (((mapy / 2) - tempY) + ((mapy / 2) - tempwinY - 1)));
+						}
+						else {
+							dy = winy - y;
+						}
+
+						for (int x = 0; x < mapx; x++) {
+							cudafloat dx = 0;
+							cudafloat distanceFromNode = 0;
+
+							if (dz != 0) {
+								// 4 direction distance
+								// left
+								leftDist += ((x + winx + 1) * (x + winx + 1));
+
+								// right
+								rightDist += (((mapx - x) + (mapx - winx - 1)) * ((mapx - x) + (mapx - winx - 1)));
+
+								// top
+								topDist += ((winx - x) * (winx - x));
+
+								// bottom
+								botDist += ((winx - x) * (winx - x));
+
+							}
+							else {
+								dx = winx - x;
+							}
+
+							if (dz) {
+								distanceFromNode = leftDist < rightDist ? leftDist : rightDist;
+								distanceFromNode = distanceFromNode < topDist ? distanceFromNode : topDist;
+								distanceFromNode = distanceFromNode < botDist ? distanceFromNode : botDist;
+							}
+							else {
+								distanceFromNode = dx * dx + dy * dy;
+							}
+
+							if (distanceFromNode < squareNeighbourhoodRadius) {
+								cudafloat m_dInfluence = exp(-(distanceFromNode) / (2 * squareNeighbourhoodRadius));
+
+								for (int k = 0; k < features; k++) {
+									weights(k, x, y) += (cudafloat)(learningRate * m_dInfluence * (inputData(vector, k) - weights(k, x, y)));
+								}
 							}
 						}
 					}
@@ -251,7 +336,9 @@ namespace GPUMLib {
 
 				learningRate = (cudafloat)(GPUMLIB_SOM_INITIAL_LEARNING_RATE * exp(cudafloat(-currentIteration) / iter));
 
-				NormalizeWeights(weights);
+				if (tools == 1) {
+					NormalizeWeights(weights);
+				}
 			}
 
 			if (progress.WasCanceled()) break;
