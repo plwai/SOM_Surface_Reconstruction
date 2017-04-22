@@ -60,7 +60,7 @@ namespace GPUMLib {
 
 		cudafloat CalculateDistance(int input, int wx, int wy, CudaMatrix<cudafloat> & inputData, CudaMatrix3D<cudafloat> & weights);
 
-		void InitWeights(CudaMatrix3D<cudafloat> & weights);
+		void InitWeights(CudaMatrix3D<cudafloat> & weights, int & tools, int maxScale);
 
 		void NormalizeWeights(CudaMatrix3D<cudafloat> & weights);
 

@@ -44,7 +44,7 @@ namespace GPUMLib {
 
 		QStringList ReadLine() {
 			QStringList line = fs.readLine().split(splitExpression);
-      QStringList coordinates = (QStringList() << line[0] << line[1] << line[2]);
+			QStringList coordinates = (QStringList() << line[0] << line[1] << line[2]);
 			coordinates.append(QString::number(currentVertex));
 
 			return coordinates;

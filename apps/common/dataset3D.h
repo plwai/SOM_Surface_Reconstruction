@@ -150,18 +150,6 @@ namespace GPUMLib {
 
             cudafloat v = *iter++;
 
-            if (rescale) {
-              if (properties.min[var] == properties.max[var]) {
-                if (v < 0) {
-                  v = 0;
-                } else if (v > 1) {
-                  v = 1;
-                }
-              } else {
-                v = (v - properties.min[var]) / (properties.max[var] - properties.min[var]);
-              }
-            }
-
             targets(s, o) = v;
           }
         }

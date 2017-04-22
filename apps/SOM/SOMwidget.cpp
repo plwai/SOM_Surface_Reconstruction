@@ -119,13 +119,16 @@ namespace GPUMLib {
 		progress.Update("Loading datasets");
 
 		std::unique_ptr<Dataset> dsTrain;
+
+		const int RESCALE_MIN = 0;
+		const int RESCALE_MAX = 1024;
 		
 		try {
 			if (tools == 1) {
 				dsTrain = std::move(std::unique_ptr<Dataset>(new Dataset(trainfile, hasHeader, false, features, 1, trainSamples, log)));
 			}
 			else {
-				dsTrain = std::move(std::unique_ptr<Dataset3D>(new Dataset3D(trainfile, hasHeader, false, features, 1, trainSamples, log)));
+				dsTrain = std::move(std::unique_ptr<Dataset3D>(new Dataset3D(trainfile, hasHeader, RESCALE_MIN, RESCALE_MAX, features, 1, trainSamples, log)));
 			}
 		} catch (QString & error) {
 			QMessageBox(QMessageBox::Warning, "Warning", QString("Error loading the training dataset. ") + error).exec();
@@ -147,10 +150,10 @@ namespace GPUMLib {
 		if (DeviceIsGPU()) targets.UpdateDevice();
 
 		CudaMatrix3D<cudafloat> weights(features, mapx, mapy * mapz);
-		InitWeights(weights);
+		InitWeights(weights, tools, RESCALE_MAX);
 
 		CudaMatrix<int> mapView(mapy * mapz, mapx);
-		for (int y = 0; y < mapy; y++) {
+		for (int y = 0; y < mapy * mapz; y++) {
 			for (int x = 0; x < mapx; x++) {
 				mapView(y, x) = 0;
 			}
@@ -208,7 +211,6 @@ namespace GPUMLib {
 				WriteWeights(weights, WEIGHTS_OUTPUT_GPU);
 
 				if (tools == 2) {
-					weights.UpdateHost();
 					WritePLYFile(weights, mapView, mapz, PLY_OUTPUT_GPU);
 				}
 			}
@@ -226,7 +228,7 @@ namespace GPUMLib {
 			viewer->setBackgroundColor(0.8, 0.89, 1);
 			viewer->addPolygonMesh(mesh, "meshes", 0);
 			viewer->initCameraParameters();
-			//viewer->setCameraPosition(109.952, 195.494, 255.042, 48.6467, 71.8613, 86.9729, -0.0669067, 0.815219, -0.575275);
+			viewer->setCameraPosition(RESCALE_MAX / 2, RESCALE_MAX / 2, RESCALE_MAX * -2, RESCALE_MAX / 2, RESCALE_MAX / 2, RESCALE_MAX / 2, 0.00586493, 0.998639, -0.0518208);
 
 			while (!viewer->wasStopped()){
 				viewer->spinOnce(100);
@@ -498,16 +500,27 @@ namespace GPUMLib {
 		return sqrt(distance);
 	}
 
-	void SOMwidget::InitWeights(CudaMatrix3D<cudafloat> & weights) {
-		for (size_t z = 0; z < weights.DimZ(); z++) { // mapy
-			for (size_t y = 0; y < weights.DimY(); y++) { // mapx
-				for (size_t x = 0; x < weights.DimX(); x++) { // features
-					weights(x, y, z) = (cudafloat)rand() / RAND_MAX;
+	void SOMwidget::InitWeights(CudaMatrix3D<cudafloat> & weights, int & tools, int maxScale) {
+		if (tools == 1) {
+			for (size_t z = 0; z < weights.DimZ(); z++) { // mapy
+				for (size_t y = 0; y < weights.DimY(); y++) { // mapx
+					for (size_t x = 0; x < weights.DimX(); x++) { // features
+						weights(x, y, z) = (cudafloat)rand() / RAND_MAX;
+					}
+				}
+			}
+
+			NormalizeWeights(weights);
+		}
+		else {
+			for (size_t z = 0; z < weights.DimZ(); z++) { // mapy
+				for (size_t y = 0; y < weights.DimY(); y++) { // mapx
+					for (size_t x = 0; x < weights.DimX(); x++) { // features
+						weights(x, y, z) = (cudafloat)rand() / maxScale;
+					}
 				}
 			}
 		}
-
-		NormalizeWeights(weights);
 
 		if (DeviceIsGPU()) weights.UpdateDevice();
 	}
