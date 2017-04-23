@@ -509,7 +509,7 @@ namespace GPUMLib {
 					}
 				}
 			}
-
+      
 			NormalizeWeights(weights);
 		}
 		else {
