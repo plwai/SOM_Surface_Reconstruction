@@ -24,6 +24,14 @@
 			<parameter name="X" type="int" summary="X Map dimension." commandline="mapx" minimum="7" />
 			<parameter name="Y" type="int" summary="Y Map dimension." commandline="mapy" minimum="7" />
 		</group>
+		<group name="Multilayer">
+			<parameter name="Number of Layer" type="int" summary="Number of Layer (1 for single layer)" commandline="multi" value="1" />
+			<parameter name="Ordering" type="list" summary="Multilayer order" commandline="layerorder">
+				<option name="Increasing" value="1"/>
+				<option name="Decreasing" value="2"/>
+			</parameter>
+			<parameter name="Map Size Interval" type="int" summary="Map Size Interval" commandline="mapinter" value="5" />
+		</group>
 		<parameter name="Iterations" type="int" summary="Number of iterations" commandline="iterations" minimum="1" />
 		<parameter name="Initial random seed" type="int" commandline="random" value="0" summary="The initial random seed. If 0 (zero) a new random seed will be obtained." />
 	</group>

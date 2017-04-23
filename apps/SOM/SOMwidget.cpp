@@ -42,6 +42,7 @@
 #include <QMessageBox>
 #include <ctime>
 #include <cmath>
+#include <string>
 
 #include <pcl/common/common.h>
 #include <pcl/io/auto_io.h>
@@ -115,6 +116,12 @@ namespace GPUMLib {
 
 		int tools = parameterValues.GetIntParameter("tools");
 
+		int layerNum = parameterValues.GetIntParameter("multi");
+
+		int layerOrder = parameterValues.GetIntParameter("layerorder");
+
+		int mapInter = parameterValues.GetIntParameter("mapinter");
+
 		ProgressInfo progress(this, "SOM - Training network", 0, maxIterations);
 		progress.Update("Loading datasets");
 
@@ -123,95 +130,123 @@ namespace GPUMLib {
 		const int RESCALE_MIN = 0;
 		const int RESCALE_MAX = 1024;
 
-		try {
-			if (tools == 1) {
-				dsTrain = std::move(std::unique_ptr<Dataset>(new Dataset(trainfile, hasHeader, false, features, 1, trainSamples, log)));
-			}
-			else {
-				dsTrain = std::move(std::unique_ptr<Dataset3D>(new Dataset3D(trainfile, hasHeader, RESCALE_MIN, RESCALE_MAX, features, 1, trainSamples, log)));
-			}
-		} catch (QString & error) {
-			QMessageBox(QMessageBox::Warning, "Warning", QString("Error loading the training dataset. ") + error).exec();
-			return;
-		} catch (...) {
-			QMessageBox(QMessageBox::Warning, "Warning", QString("Error loading the training dataset: <i>%1</i>.").arg(trainfile)).exec();
-			return;
-		}
-
-		int vectors = dsTrain->NumberOfSamples();
 		int mapx = parameterValues.GetIntParameter("mapx");
-		int mapy = parameterValues.GetIntParameter("mapy");
+		int mapy = parameterValues.GetIntParameter("mapy") / tools;
 		int mapz = parameterValues.GetIntParameter("maptype");
 
-		CudaMatrix<cudafloat> inputs(dsTrain->GetInputs());
+		for (int layer = 0; layer < layerNum; layer++) {
+			if (layer) {
+				if (layerOrder == 1) {
+					mapx += mapInter;
+					mapy += mapInter;
+				}
+				else {
+					mapx -= mapInter;
+					mapy -= mapInter;
+				}
 
-		CudaArray<int> targets(vectors);
-		for (int i = 0; i < vectors; i++) targets[i] = (int)dsTrain->GetTargets()(i, 0);
-		if (DeviceIsGPU()) targets.UpdateDevice();
+				if (DeviceIsGPU()) {
+					trainfile = PLY_OUTPUT_GPU;
+				}
+				else {
+					trainfile = PLY_OUTPUT_CPU;
+				}
 
-		CudaMatrix3D<cudafloat> weights(features, mapx, mapy * mapz);
-		InitWeights(weights, tools, RESCALE_MAX);
+				maxIterations += 1000;
 
-		CudaMatrix<int> mapView(mapy * mapz, mapx);
-		for (int y = 0; y < mapy * mapz; y++) {
-			for (int x = 0; x < mapx; x++) {
-				mapView(y, x) = 0;
-			}
-		}
-
-		CudaArray<int> winNode(vectors);
-		for (int i = 0; i < vectors; i++) winNode[i] = 0;
-
-		if (DeviceIsGPU()) {
-			mapView.UpdateDevice();
-			winNode.UpdateDevice();
-		}
-
-		cudafloat mapRadius = std::max(std::max(mapx, mapy / mapz), mapz) / cudafloat(2.0);
-		cudafloat timeConstant = maxIterations / std::log(mapRadius);
-
-		progress.Update("Training network ...");
-
-		if (DeviceIsCPU()) {
-			clock_t initialTime = clock();
-			int iteration = TrainCPU(progress, maxIterations, inputs, targets, weights, mapView, winNode, mapRadius, timeConstant, summaryLog, log, tools, mapz);
-			double elapsedTime = (clock() - initialTime) / 1000.0;
-
-			summaryLog.AppendParagraph(QString("Training complete (%1 iterations).").arg(iteration));
-			log.AppendParagraph(QString("CPU Training time (%1 iterations) : %2s").arg(iteration).arg(elapsedTime));
-
-			log.AppendLine();
-			log.AppendLine("Map:");
-
-			ShowMapView(log, mapView, MAP_OUTPUT_CPU);
-
-			WriteWeights(weights, WEIGHTS_OUTPUT_CPU);
-
-			if (tools == 2) {
-				WritePLYFile(weights, mapView, mapz, PLY_OUTPUT_CPU);
+				if (parameterValues.GetIntParameter("random") == 0) {
+					srand(time(NULL));
+				}
 			}
 
-		} else {
-			clock_t initialTime = clock();
-			int iteration = TrainGPU(progress, maxIterations, inputs, targets, weights, mapView, winNode, mapRadius, timeConstant, summaryLog, log, tools, mapz);
-			cudaThreadSynchronize();
-			double elapsedTime = (clock() - initialTime) / 1000.0;
+			try {
+				if (tools == 1) {
+					dsTrain = std::move(std::unique_ptr<Dataset>(new Dataset(trainfile, hasHeader, false, features, 1, trainSamples, log)));
+				}
+				else {
+					dsTrain = std::move(std::unique_ptr<Dataset3D>(new Dataset3D(trainfile, hasHeader, RESCALE_MIN, RESCALE_MAX, features, 1, trainSamples, log)));
+				}
+			} catch (QString & error) {
+				QMessageBox(QMessageBox::Warning, "Warning", QString("Error loading the training dataset. ") + error).exec();
+				return;
+			} catch (...) {
+				QMessageBox(QMessageBox::Warning, "Warning", QString("Error loading the training dataset: <i>%1</i>.").arg(trainfile)).exec();
+				return;
+			}
 
-			if (iteration > 0) {
+			int vectors = dsTrain->NumberOfSamples();
+
+			CudaMatrix<cudafloat> inputs(dsTrain->GetInputs());
+
+			CudaArray<int> targets(vectors);
+			for (int i = 0; i < vectors; i++) targets[i] = (int)dsTrain->GetTargets()(i, 0);
+			if (DeviceIsGPU()) targets.UpdateDevice();
+
+			CudaMatrix3D<cudafloat> weights(features, mapx, mapy * mapz);
+			InitWeights(weights, tools, RESCALE_MAX);
+
+			CudaMatrix<int> mapView(mapy * mapz, mapx);
+			for (int y = 0; y < mapy * mapz; y++) {
+				for (int x = 0; x < mapx; x++) {
+					mapView(y, x) = 0;
+				}
+			}
+
+			CudaArray<int> winNode(vectors);
+			for (int i = 0; i < vectors; i++) winNode[i] = 0;
+
+			if (DeviceIsGPU()) {
+				mapView.UpdateDevice();
+				winNode.UpdateDevice();
+			}
+
+			cudafloat mapRadius = std::max(std::max(mapx, mapy / mapz), mapz) / cudafloat(2.0);
+			cudafloat timeConstant = maxIterations / std::log(mapRadius);
+
+			progress.Update(("Training network ... layer " + std::to_string(layer)).c_str());
+
+			if (DeviceIsCPU()) {
+				clock_t initialTime = clock();
+				int iteration = TrainCPU(progress, maxIterations, inputs, targets, weights, mapView, winNode, mapRadius, timeConstant, summaryLog, log, tools, mapz);
+				double elapsedTime = (clock() - initialTime) / 1000.0;
+
 				summaryLog.AppendParagraph(QString("Training complete (%1 iterations).").arg(iteration));
-				log.AppendParagraph(QString("GPU Training time (%1 iterations) : %2s").arg(iteration).arg(elapsedTime));
+				log.AppendParagraph(QString("CPU Training time (%1 iterations) : %2s").arg(iteration).arg(elapsedTime));
 
 				log.AppendLine();
 				log.AppendLine("Map:");
 
-				mapView.UpdateHost();
-				ShowMapView(log, mapView, MAP_OUTPUT_GPU);
+				ShowMapView(log, mapView, MAP_OUTPUT_CPU);
 
-				weights.UpdateHost();
-				WriteWeights(weights, WEIGHTS_OUTPUT_GPU);
+				WriteWeights(weights, WEIGHTS_OUTPUT_CPU);
 
 				if (tools == 2) {
-					WritePLYFile(weights, mapView, mapz, PLY_OUTPUT_GPU);
+					WritePLYFile(weights, mapView, mapz, PLY_OUTPUT_CPU);
+				}
+
+			}
+			else {
+				clock_t initialTime = clock();
+				int iteration = TrainGPU(progress, maxIterations, inputs, targets, weights, mapView, winNode, mapRadius, timeConstant, summaryLog, log, tools, mapz);
+				cudaThreadSynchronize();
+				double elapsedTime = (clock() - initialTime) / 1000.0;
+
+				if (iteration > 0) {
+					summaryLog.AppendParagraph(QString("Training complete (%1 iterations).").arg(iteration));
+					log.AppendParagraph(QString("GPU Training time (%1 iterations) : %2s").arg(iteration).arg(elapsedTime));
+
+					log.AppendLine();
+					log.AppendLine("Map:");
+
+					mapView.UpdateHost();
+					ShowMapView(log, mapView, MAP_OUTPUT_GPU);
+
+					weights.UpdateHost();
+					WriteWeights(weights, WEIGHTS_OUTPUT_GPU);
+
+					if (tools == 2) {
+						WritePLYFile(weights, mapView, mapz, PLY_OUTPUT_GPU);
+					}
 				}
 			}
 		}
