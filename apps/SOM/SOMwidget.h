@@ -56,17 +56,17 @@ namespace GPUMLib {
 		int TrainCPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log, int & tools, int & maptype);
 		int TrainGPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log, int & tools, int & maptype);
 
-		void FindBestMatchingUnit(int vector, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode);
+		void FindBestMatchingUnit(int vector, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<Features> & weights, CudaMatrix3D<int> & mapView, CudaArray<int> & winNode);
 
-		cudafloat CalculateDistance(int input, int wx, int wy, CudaMatrix<cudafloat> & inputData, CudaMatrix3D<cudafloat> & weights);
+		cudafloat CalculateDistance(int input, int wx, int wy, int wz, CudaMatrix<cudafloat> & inputData, CudaMatrix3D<Features> & weights);
 
 		void InitWeights(CudaMatrix3D<cudafloat> & weights, int & tools, int maxScale);
 
-		void NormalizeWeights(CudaMatrix3D<cudafloat> & weights);
+		void NormalizeWeights(CudaMatrix3D<Features> & weights);
 
-		void WriteWeights(CudaMatrix3D<cudafloat> & weights, char * weightsOutput);
+		void WriteWeights(CudaMatrix3D<Features> & weights, char * weightsOutput);
 
-		void ShowMapView(LogHTML & log, CudaMatrix<int> & mapView, char * mapOutput);
+		void ShowMapView(LogHTML & log, CudaMatrix3D<int> & mapView, char * mapOutput);
 
 		void WritePLYFile(CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, int mapz, char * plyOutput);
 

@@ -192,8 +192,10 @@ namespace GPUMLib {
 			}
 
 		} else {
+
 			clock_t initialTime = clock();
 			int iteration = TrainGPU(progress, maxIterations, inputs, targets, weights, mapView, winNode, mapRadius, timeConstant, summaryLog, log, tools, mapz);
+
 			cudaThreadSynchronize();
 			double elapsedTime = (clock() - initialTime) / 1000.0;
 
@@ -242,8 +244,9 @@ namespace GPUMLib {
 
 		int features = (int)inputData.Columns();
 		int samples = (int)inputData.Rows();
-		int mapx = (int)mapView.Columns();
-		int mapy = (int)mapView.Rows();
+		int mapx = (int)mapView.DimZ();
+		int mapy = (int)mapView.DimY();
+		int mapz = (int)mapView.DimX();
 
 		int currentIteration = 0;
 
@@ -375,6 +378,7 @@ namespace GPUMLib {
 		return QString("A CUDA <b>error</b> has occurred during training (iteration %1): %2").arg(iteration).arg(cudaGetErrorString(error));
 	}
 
+
 	int SOMwidget::TrainGPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log, int & tools, int & mapType) {
 		cudafloat learningRate = GPUMLIB_SOM_INITIAL_LEARNING_RATE;
 
@@ -461,41 +465,51 @@ namespace GPUMLib {
 		}
 
 		return currentIteration;
-	}
+	}*/
 
-	void SOMwidget::FindBestMatchingUnit(int vector, CudaMatrix<cudafloat> & inputData, CudaArray<int> & target, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode) {
+	void SOMwidget::FindBestMatchingUnit(int vector, CudaMatrix<cudafloat> & inputData, CudaArray<int> & target, CudaMatrix3D<Features> & weights, CudaMatrix3D<int> & mapView, CudaArray<int> & winNode) {
 		cudafloat lowestDistance = MAX_CUDAFLOAT;
 
 		int winx = -1;
 		int winy = -1;
+		int winz = -1;
 
-		int rows = (int)mapView.Rows();
-		int columns = (int)mapView.Columns();
+		int rows = (int)mapView.DimY();
+		int columns = (int)mapView.DimZ();
+		int depth = (int)mapView.DimX();
 
 		for (int y = 0; y < rows; y++) {
 			for (int x = 0; x < columns; x++) {
-				cudafloat distance = CalculateDistance(vector, x, y, inputData, weights);
+				for (int z = 0; z < depth; z++) {
+					cudafloat distance = CalculateDistance(vector, x, y, z, inputData, weights);
 
-				if (distance < lowestDistance) {
-					lowestDistance = distance;
-					winx = x;
-					winy = y;
+					if (distance < lowestDistance) {
+						lowestDistance = distance;
+						winx = x;
+						winy = y;
+						winz = z;
+					}
 				}
 			}
 		}
 
-		winNode[vector] = winy * columns + winx;
-		mapView(winy, winx) = target[vector];
+		winNode[vector] = winy * columns + winx + winz * columns * rows;
+		mapView(winz, winy, winx) = target[vector];
 	}
 
-	cudafloat SOMwidget::CalculateDistance(int input, int wx, int wy, CudaMatrix<cudafloat> & inputData, CudaMatrix3D<cudafloat> & weights) {
+	cudafloat SOMwidget::CalculateDistance(int input, int wx, int wy, int wz, CudaMatrix<cudafloat> & inputData, CudaMatrix3D<Features> & weights) {
 		cudafloat distance = 0.0f;
 
 		int features = (int)inputData.Columns();
-		for (int f = 0; f < features; f++) {
-			cudafloat d = inputData(input, f) - weights(f, wx, wy);
-			distance += d * d;
-		}
+
+		cudafloat d = inputData(input, 0) - weights(wz, wx, wy).x;
+		distance += d * d;
+
+		d = inputData(input, 1) - weights(wz, wx, wy).y;
+		distance += d * d;
+
+		d = inputData(input, 2) - weights(wz, wx, wy).z;
+		distance += d * d;
 
 		return sqrt(distance);
 	}
@@ -525,55 +539,64 @@ namespace GPUMLib {
 		if (DeviceIsGPU()) weights.UpdateDevice();
 	}
 
-	void SOMwidget::NormalizeWeights(CudaMatrix3D<cudafloat> & weights) {
+	void SOMwidget::NormalizeWeights(CudaMatrix3D<Features> & weights) {
 		for (size_t z = 0; z < weights.DimZ(); z++) { // mapy
 			for (size_t y = 0; y < weights.DimY(); y++) { // mapx
-				double norm = 0.0;
+				for (size_t x = 0; x < weights.DimX(); x++) { // mapz
+					double norm = 0.0;
+					Features current_weight;
 
-				for (size_t x = 0; x < weights.DimX(); x++) { // features
-					cudafloat current_weight = weights(x, y, z);
-					norm += current_weight * current_weight;
-				}
+					current_weight = weights(x, y, z);
+					norm += current_weight.x * current_weight.x;
+					norm += current_weight.y * current_weight.y;
+					norm += current_weight.z * current_weight.z;
 
-				norm = 1.0 / (sqrt(norm));
+					norm = 1.0 / (sqrt(norm));
 
-				for (size_t x = 0; x < weights.DimX(); x++) {
-					weights(x, y, z) *= (cudafloat)norm;
+					current_weight.x *= (cudafloat)norm;
+					current_weight.y *= (cudafloat)norm;
+					current_weight.z *= (cudafloat)norm;
+
+					weights(x, y, z) = current_weight;
+
 				}
 			}
 		}
 	}
 
-	void SOMwidget::WriteWeights(CudaMatrix3D<cudafloat> & weights, char * weightsOutput) {
+	void SOMwidget::WriteWeights(CudaMatrix3D<Features> & weights, char * weightsOutput) {
 		FILE *fw = fopen(weightsOutput, "w");
 
 		for (size_t z = 0; z < weights.DimZ(); z++) { // mapy
 			for (size_t y = 0; y < weights.DimY(); y++) { // mapx
-				for (size_t x = 0; x < weights.DimX(); x++) { // features
-					fprintf(fw, "%.4lf ", weights(x, y, z));
+				for (size_t x = 0; x < weights.DimX(); x++) { // mapz
+					fprintf(fw, "%.4lf ", weights(x, y, z).x);
+					fprintf(fw, "%.4lf ", weights(x, y, z).y);
+					fprintf(fw, "%.4lf ", weights(x, y, z).z);
+					fprintf(fw, "\n");
 				}
-				fprintf(fw, "\n");
 			}
 		}
 
 		fclose(fw);
 	}
 
-	void SOMwidget::ShowMapView(LogHTML & log, CudaMatrix<int> & mapView, char * mapOutput) {
+	void SOMwidget::ShowMapView(LogHTML & log, CudaMatrix3D<int> & mapView, char * mapOutput) {
 		FILE *fs = fopen(mapOutput, "w");
 
-		log.BeginTable(0);
+		for (size_t k = 0; k < mapView.DimX(); k++) {
+			log.BeginTable(0);
 
-		for (size_t i = 0; i < mapView.Rows(); i++) {
-			log.BeginRow();
+			for (size_t i = 0; i < mapView.DimY(); i++) {
+				log.BeginRow();
 
-			for (size_t j = 0; j < mapView.Columns(); j++) {
-				log.AddColumn(mapView(i, j));
-				fprintf(fs, "%d ", mapView(i, j));
+				for (size_t j = 0; j < mapView.DimZ(); j++) {
+					log.AddColumn(mapView(k, i, j));
+					fprintf(fs, "%d ", mapView(k, i, j));
+				}
+				log.EndRow();
+				fprintf(fs, "\n");
 			}
-			log.EndRow();
-			fprintf(fs, "\n");
-		}
 
 		log.EndTable();
 
