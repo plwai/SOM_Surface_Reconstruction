@@ -54,7 +54,7 @@ namespace GPUMLib {
 	void SOMwidget::LogConfiguration(LogHTML & log, ParameterValues & parameterValues) {
 		log.AppendSection("SOM configuration");
 		log.BeginTable(0, 1);
-		
+
 		log.BeginRow();
 		log.AddColumn("Map width (X dimension)");
 		log.AddColumn(parameterValues["mapx"]);
@@ -310,7 +310,7 @@ namespace GPUMLib {
 					return 0;
 				}
 
-				/*error = NormalizeWeightsSOM(gridMap, threadsFeatures, mapx, mapy, features, weights.DevicePointer());
+				error = NormalizeWeightsSOM(gridMap, threadsFeatures, mapx, mapy, features, weights.DevicePointer());
 
 				if (error != cudaSuccess) {
 					QString e = CudaError(currentIteration, error);
@@ -318,7 +318,7 @@ namespace GPUMLib {
 					log.Append(e);
 
 					return 0;
-				}*/
+				}
 
 				learningRate = (cudafloat)(GPUMLIB_SOM_INITIAL_LEARNING_RATE * exp(cudafloat(-currentIteration) / iter));
 			}
@@ -377,7 +377,7 @@ namespace GPUMLib {
 			}
 		}
 
-		//NormalizeWeights(weights);
+		NormalizeWeights(weights);
 
 		if (DeviceIsGPU()) weights.UpdateDevice();
 	}
