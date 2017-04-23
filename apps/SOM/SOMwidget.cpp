@@ -62,7 +62,7 @@ namespace GPUMLib {
 	void SOMwidget::LogConfiguration(LogHTML & log, ParameterValues & parameterValues) {
 		log.AppendSection("SOM configuration");
 		log.BeginTable(0, 1);
-		
+
 		log.BeginRow();
 		log.AddColumn("Map width (X dimension)");
 		log.AddColumn(parameterValues["mapx"]);
@@ -122,7 +122,7 @@ namespace GPUMLib {
 
 		const int RESCALE_MIN = 0;
 		const int RESCALE_MAX = 1024;
-		
+
 		try {
 			if (tools == 1) {
 				dsTrain = std::move(std::unique_ptr<Dataset>(new Dataset(trainfile, hasHeader, false, features, 1, trainSamples, log)));
@@ -223,7 +223,7 @@ namespace GPUMLib {
 		if (tools == 2) {
 			pcl::PolygonMesh mesh;
 			pcl::io::load(DeviceIsCPU() ? PLY_OUTPUT_CPU : PLY_OUTPUT_GPU, mesh);
-			
+
 			boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("3D Viewer"));
 			viewer->setBackgroundColor(0.8, 0.89, 1);
 			viewer->addPolygonMesh(mesh, "meshes", 0);
@@ -264,7 +264,7 @@ namespace GPUMLib {
 					// Basic Map
 					for (int y = 0; y < mapy; y++) {
 						for (int x = 0; x < mapx; x++) {
-							
+
 
 							cudafloat dx = winx - x;
 							cudafloat dy = winy - y;
@@ -288,7 +288,7 @@ namespace GPUMLib {
 						int tempwinY = winy >= (mapy / 2) ? winy - (mapy / 2) : winy;
 
 						cudafloat dz = abs((int)(winy / (mapy / 2)) - (int)(y / (mapy / 2)));
-						
+
 						cudafloat dy = 0;
 						cudafloat leftDist = 0;
 						cudafloat rightDist = 0;
@@ -607,7 +607,7 @@ namespace GPUMLib {
 		plyTemplate += std::to_string(faceNum);
 		plyTemplate += "\nproperty list uchar int vertex_indices\nend_header\n";
 
-		// Write header 
+		// Write header
 		fprintf(fs, plyTemplate.c_str());
 
 		// Write points
