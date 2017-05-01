@@ -7,14 +7,25 @@
 	<parameter name="Device" type="device" commandline="device" summary="Device (CPU or GPU) to be used to train the SOM network." />
 	<group name="Training Dataset">
 		<parameter name="Header line" type="bool" summary="If true the first line of the datasets (containing the caption) will be ignored" commandline="header" value="false" />
-		<parameter name="Filename" type="filename" summary="Training filename" commandline="trainfile" filter="Dataset (*.csv *.txt);;All files (*.*)" />
+		<parameter name="Filename" type="filename" summary="Training filename" commandline="trainfile" filter="Dataset3D (*.ply);;All files (*.*)" />
 		<parameter name="Samples" type="int" summary="Number of training samples to be processed. A value of 0 (zero) means all." commandline="trainsamples" minimum="0" value="0" />
-		<parameter name="Features" type="int" summary="Number of training features (variables)." commandline="features" minimum="1" />
 	</group>
 	<group name="Training configuration">
+		<parameter name="Map Type" type="list" summary="SOM layer algorithm" commandline="maptype">
+			<option name="Basic Map" value="1"/>
+			<option name="Dual Layer Map (For Surface Reconstruction Only!)" value="2"/>
+		</parameter>
 		<group name="Map">
 			<parameter name="X" type="int" summary="X Map dimension." commandline="mapx" minimum="7" />
 			<parameter name="Y" type="int" summary="Y Map dimension." commandline="mapy" minimum="7" />
+		</group>
+		<group name="Multilayer">
+			<parameter name="Number of Layer" type="int" summary="Number of Layer (1 for single layer)" commandline="multi" value="1" />
+			<parameter name="Ordering" type="list" summary="Multilayer order" commandline="layerorder">
+				<option name="Increasing" value="1"/>
+				<option name="Decreasing" value="2"/>
+			</parameter>
+			<parameter name="Map Size Interval" type="int" summary="Map Size Interval" commandline="mapinter" value="5" />
 		</group>
 		<parameter name="Iterations" type="int" summary="Number of iterations" commandline="iterations" minimum="1" />
 		<parameter name="Initial random seed" type="int" commandline="random" value="0" summary="The initial random seed. If 0 (zero) a new random seed will be obtained." />

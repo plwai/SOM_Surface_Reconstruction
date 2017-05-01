@@ -30,8 +30,8 @@
 	along with this program. If not, see <http://www.gnu.org/licenses/>.
 	*/
 
-#ifndef GPUMLIB_SOM_WIDGET_H
-#define GPUMLIB_SOM_WIDGET_H
+#ifndef GPUMLIB_SOM_SURFACE_WIDGET_H
+#define GPUMLIB_SOM_SURFACE_WIDGET_H
 
 #include "../common/widget/AlgorithmWidget.h"
 #include "../common/progress/ProgressInfo.h"
@@ -42,32 +42,33 @@
 
 namespace GPUMLib {
 
-	class SOMwidget : public AlgorithmWidget {
+	class SOMSurfacewidget : public AlgorithmWidget {
 		Q_OBJECT
 
 	public:
-		explicit SOMwidget(const char * parameterFile, int argc, char ** argv, QWidget *parent = 0) : AlgorithmWidget(parameterFile, argc, argv, parent) {}
+		explicit SOMSurfacewidget(const char * parameterFile, int argc, char ** argv, QWidget *parent = 0) : AlgorithmWidget(parameterFile, argc, argv, parent) {}
 
 	private:
 
 		virtual void Run(ParameterValues & parameterValues, LogHTML & summaryLog, LogHTML & log) override;
 		virtual void LogConfiguration(LogHTML & log, ParameterValues & parameterValues) override;
 
-		int TrainCPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log);
-		int TrainGPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log);
+		int TrainCPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log, int & maptype);
+		int TrainGPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log, int & maptype);
 
 		void FindBestMatchingUnit(int vector, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode);
 
 		cudafloat CalculateDistance(int input, int wx, int wy, CudaMatrix<cudafloat> & inputData, CudaMatrix3D<cudafloat> & weights);
 
-		void InitWeights(CudaMatrix3D<cudafloat> & weights);
-
-		void NormalizeWeights(CudaMatrix3D<cudafloat> & weights);
+		void InitWeights(CudaMatrix3D<cudafloat> & weights, int maxScale);
 
 		void WriteWeights(CudaMatrix3D<cudafloat> & weights, char * weightsOutput);
 
 		void ShowMapView(LogHTML & log, CudaMatrix<int> & mapView, char * mapOutput);
 
+		void WritePLYFile(CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, int mapz, char * plyOutput);
+
+		int getMapLocation(int row, int col, int mapx);
 	};
 
 } // namespace GPUMLib

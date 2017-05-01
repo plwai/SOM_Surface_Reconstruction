@@ -30,7 +30,7 @@
 	 along with this program. If not, see <http://www.gnu.org/licenses/>.
 	 */
 
-#include "som_kernels.h"
+#include "som_surface_kernels.h"
 
 __global__ void ComputeDistancesSOMkernel(cudafloat * inputData, cudafloat * weights, int vector, int features, cudafloat * distances) {
 	extern __shared__ cudafloat sdist [];
@@ -106,44 +106,93 @@ cudaError_t UpdateWeightsSOM(dim3 blockSize, int * bmu, int * mapView, int mapx,
 	return cudaGetLastError();
 }
 
-__global__ void NormalizeWeightsSOMkernel(int mapx, int mapy, int features, cudafloat * weights) {
-	extern __shared__ cudafloat snorm[];
+__global__ void UpdateWeightsSOMDualkernel(int * bmu, int * mapView, int mapx, int mapy, cudafloat * inputData, int vector, int features, int target, cudafloat neighbourhoodRadiusSquare, cudafloat * weights, cudafloat learningRate) {
+	__shared__ int winx;
+	__shared__ int winy;
 
-	int idx = (blockIdx.y * gridDim.x + blockIdx.x) * features;
-
-	cudafloat norm = 0.0;
-
-	for (int f = threadIdx.x; f < features; f += blockDim.x) {
-		cudafloat weight = weights[idx + f];
-		norm += weight * weight;
+	if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+		winx = *bmu % mapx;
+		winy = *bmu / mapx;
+		mapView[*bmu] = target;
 	}
-
-	snorm[threadIdx.x] = norm;
-
 	__syncthreads();
 
-	// reduction
-	for (int dist = blockDim.x; dist >= 2;) {
-		dist /= 2;
-		if (threadIdx.x < dist) {
-			snorm[threadIdx.x] += snorm[threadIdx.x + dist];
+	for (int y = threadIdx.z; y < mapy; y += blockDim.z) {
+		cudafloat distance = 0;
+		cudafloat dz = abs((int)(winy / (mapy / 2)) - (int)(y / (mapy / 2)));
+		cudafloat dy = 0;
+		cudafloat leftDist = 0;
+		cudafloat rightDist = 0;
+		cudafloat topDist = 0;
+		cudafloat botDist = 0;
+		int tempY = y >= (mapy / 2) ? y - (mapy / 2) : y;
+		int tempwinY = winy >= (mapy / 2) ? winy - (mapy / 2) : winy;
+
+		if (dz != 0) {
+			// 4 direction distance
+			// left
+			leftDist = (tempwinY - tempY) * (tempwinY - tempY);
+
+			// right
+			rightDist = leftDist;
+
+			// top
+			topDist = ((tempY + tempwinY + 1) * (tempY + tempwinY + 1));
+
+			// bottom
+			botDist = ((((mapy / 2) - tempY) + ((mapy / 2) - tempwinY - 1)) * (((mapy / 2) - tempY) + ((mapy / 2) - tempwinY - 1)));
 		}
-		__syncthreads();
-	}
+		else {
+			dy = winy - y;
+		}
 
-	if (threadIdx.x == 0) {
-		*snorm = CUDA_RSQRT(*snorm);
-	}
 
-	__syncthreads();
+		for (int x = threadIdx.y; x < mapx; x += blockDim.y) {
+			cudafloat dx = 0;
 
-	for (int f = threadIdx.x; f < features; f += blockDim.x) {
-		weights[idx + f] *= *snorm;
+			if (dz != 0) {
+				// 4 direction distance
+				// left
+				leftDist += ((x + winx + 1) * (x + winx + 1));
+
+				// right
+				rightDist += (((mapx - x) + (mapx - winx - 1)) * ((mapx - x) + (mapx - winx - 1)));
+
+				// top
+				topDist += ((winx - x) * (winx - x));
+
+				// bottom
+				botDist += ((winx - x) * (winx - x));
+
+			}
+			else {
+				dx = winx - x;
+			}
+
+			if (dz) {
+				distance = leftDist < rightDist ? leftDist : rightDist;
+				distance = distance < topDist ? distance : topDist;
+				distance = distance < botDist ? distance : botDist;
+			}
+			else {
+				distance = dx * dx + dy * dy;
+			}
+
+			cudafloat influence = exp(-distance / (2 * neighbourhoodRadiusSquare));
+
+			if (distance < neighbourhoodRadiusSquare) {
+				for (int f = threadIdx.x; f < features; f += blockDim.x) {
+					int idx = (y * mapx + x) * features + f;
+
+					weights[idx] += learningRate * influence * (inputData[vector * features + f] - weights[idx]);
+				}
+			}
+		}
 	}
 }
 
-cudaError_t NormalizeWeightsSOM(dim3 gridSize, int blockSize, int mapx, int mapy, int features, cudafloat * weights) {
-	NormalizeWeightsSOMkernel<<<gridSize, blockSize, blockSize * sizeof(cudafloat)>>>(mapx, mapy, features, weights);
+cudaError_t UpdateWeightsSOMDual(dim3 blockSize, int * bmu, int * mapView, int mapx, int mapy, cudafloat * inputData, int vector, int features, int target, cudafloat neighbourhoodRadiusSquared, cudafloat * weights, cudafloat learningRate) {
+	UpdateWeightsSOMDualkernel << <1, blockSize >> >(bmu, mapView, mapx, mapy, inputData, vector, features, target, neighbourhoodRadiusSquared, weights, learningRate);
 
 	return cudaGetLastError();
 }

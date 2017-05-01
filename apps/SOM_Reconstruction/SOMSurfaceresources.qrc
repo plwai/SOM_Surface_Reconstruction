@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/files">
+        <file>parameters.xml</file>
+    </qresource>
+</RCC>
