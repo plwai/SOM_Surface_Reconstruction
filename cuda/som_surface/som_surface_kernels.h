@@ -39,4 +39,4 @@ cudaError_t ComputeDistancesSOM(dim3 gridSize, int blockSize, cudafloat * inputD
 cudaError_t UpdateWeightsSOM(dim3 blockSize, int * bmu, int * mapView, int mapx, int mapy, cudafloat * inputData, int vector, int features, int target, cudafloat neighbourhoodRadiusSquared, cudafloat * weights, cudafloat learningRate);
 cudaError_t UpdateWeightsSOMDual(dim3 blockSize, int * bmu, int * mapView, int mapx, int mapy, cudafloat * inputData, int vector, int features, int target, cudafloat neighbourhoodRadiusSquared, cudafloat * weights, cudafloat learningRate);
 
-#endif //GPUMLIB_SOM_KERNELS
+#endif //GPUMLIB_SOM_SURFACE_KERNELS
