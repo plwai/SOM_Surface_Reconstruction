@@ -1,4 +1,4 @@
-﻿/*
+/*
 	Noel Lopes is a Professor at the Polytechnic of Guarda, Portugal
 	and a researcher at the CISUC - University of Coimbra, Portugal
 
@@ -37,7 +37,6 @@
 
 cudaError_t ComputeDistancesSOM(dim3 gridSize, int blockSize, cudafloat * inputData, cudafloat * weights, int vector, int numberFeatures, cudafloat * distances);
 cudaError_t UpdateWeightsSOM(dim3 blockSize, int * bmu, int * mapView, int mapx, int mapy, cudafloat * inputData, int vector, int features, int target, cudafloat neighbourhoodRadiusSquared, cudafloat * weights, cudafloat learningRate);
-cudaError_t UpdateWeightsSOMDual(dim3 blockSize, int * bmu, int * mapView, int mapx, int mapy, cudafloat * inputData, int vector, int features, int target, cudafloat neighbourhoodRadiusSquared, cudafloat * weights, cudafloat learningRate);
 cudaError_t NormalizeWeightsSOM(dim3 gridSize, int blockSize, int mapx, int mapy, int features, cudafloat * weights);
 
 #endif //GPUMLIB_SOM_KERNELS

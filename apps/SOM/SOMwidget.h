@@ -53,14 +53,14 @@ namespace GPUMLib {
 		virtual void Run(ParameterValues & parameterValues, LogHTML & summaryLog, LogHTML & log) override;
 		virtual void LogConfiguration(LogHTML & log, ParameterValues & parameterValues) override;
 
-		int TrainCPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log, int & tools, int & maptype);
-		int TrainGPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log, int & tools, int & maptype);
+		int TrainCPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log);
+		int TrainGPU(ProgressInfo & progress, int iterations, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log);
 
 		void FindBestMatchingUnit(int vector, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode);
 
 		cudafloat CalculateDistance(int input, int wx, int wy, CudaMatrix<cudafloat> & inputData, CudaMatrix3D<cudafloat> & weights);
 
-		void InitWeights(CudaMatrix3D<cudafloat> & weights, int & tools, int maxScale);
+		void InitWeights(CudaMatrix3D<cudafloat> & weights);
 
 		void NormalizeWeights(CudaMatrix3D<cudafloat> & weights);
 
@@ -68,9 +68,6 @@ namespace GPUMLib {
 
 		void ShowMapView(LogHTML & log, CudaMatrix<int> & mapView, char * mapOutput);
 
-		void WritePLYFile(CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, int mapz, char * plyOutput);
-
-		int getMapLocation(int row, int col, int mapx);
 	};
 
 } // namespace GPUMLib
