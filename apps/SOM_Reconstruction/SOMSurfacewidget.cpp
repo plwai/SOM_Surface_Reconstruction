@@ -173,7 +173,8 @@ namespace GPUMLib {
 					trainfile = PLY_OUTPUT_CPU;
 				}
 
-				maxIterations += 1000;
+				maxIterations += 500;
+				ProgressInfo progress(this, "SOM - Training network", 0, maxIterations);
 
 				if (parameterValues.GetIntParameter("random") == 0) {
 					srand(time(NULL));
@@ -219,7 +220,7 @@ namespace GPUMLib {
 			cudafloat mapRadius = std::max(std::max(mapx, mapy / mapz), mapz) / cudafloat(2.0);
 			cudafloat timeConstant = maxIterations / std::log(mapRadius);
 
-			progress.Update(("Training network ... layer " + std::to_string(layer)).c_str());
+			progress.Update(("Training network ... layer " + std::to_string(layer + 1)).c_str());
 
 			if (DeviceIsCPU()) {
 				clock_t initialTime = clock();
@@ -236,8 +237,12 @@ namespace GPUMLib {
 
 				WriteWeights(weights, WEIGHTS_OUTPUT_CPU);
 
-				WritePLYFile(weights, mapView, mapz, PLY_OUTPUT_CPU);
-
+				if (layerNum != 1 && layer != layerNum - 1) {
+					WriteLayerPLYFile(inputs, mapView, mapz, PLY_OUTPUT_CPU);
+				}
+				else {
+					WritePLYFile(weights, mapView, mapz, PLY_OUTPUT_CPU);
+				}
 			}
 			else {
 				clock_t initialTime = clock();
@@ -258,7 +263,12 @@ namespace GPUMLib {
 					weights.UpdateHost();
 					WriteWeights(weights, WEIGHTS_OUTPUT_GPU);
 
-					WritePLYFile(weights, mapView, mapz, PLY_OUTPUT_GPU);
+					if (layerNum != 1 && layer != layerNum - 1) {
+						WriteLayerPLYFile(inputs, mapView, mapz, PLY_OUTPUT_GPU);
+					}
+					else {
+						WritePLYFile(weights, mapView, mapz, PLY_OUTPUT_GPU);
+					}
 				}
 			}
 		}
@@ -665,6 +675,58 @@ namespace GPUMLib {
 
 				fprintf(fs, "3 %d %d %d\n", getMapLocation(j + (mapy / 2) + 1, mapx - 1, mapx), getMapLocation(j + (mapy / 2), mapx - 1, mapx), getMapLocation(j, mapx - 1, mapx));
 				fprintf(fs, "3 %d %d %d\n", getMapLocation(j, mapx - 1, mapx), getMapLocation(j + 1, mapx - 1, mapx), getMapLocation(j + (mapy / 2) + 1, mapx - 1, mapx));
+			}
+		}
+
+		fclose(fs);
+	}
+
+	void SOMSurfacewidget::WriteLayerPLYFile(CudaMatrix<cudafloat> & inputs, CudaMatrix<int> & mapView, int mapz, char * plyOutput) {
+		FILE *fs = fopen(plyOutput, "w");
+
+		std::string plyTemplate = "";
+		int vertexNum = 0, faceNum;
+
+		int mapx = (int)mapView.Columns();
+		int mapy = (int)mapView.Rows();
+
+		for (int y = 0; y < mapy; y++) {
+			for (int x = 0; x < mapx; x++) {
+				if (mapView(y, x) != 0) {
+					vertexNum++;
+				}
+			}
+		}
+
+		// Prepare header template
+		if (mapz == 1) {
+			// Basic 2D Map
+			faceNum = (mapy - 1) * (mapy - 1) * 2;
+		}
+		else {
+			// Dual Layer Map
+			faceNum = (4 * ((mapy / 2) - 1)) + (mapx - 1) * 2 * mapy;
+		}
+
+		plyTemplate += "ply\nformat ascii 1.0\nelement vertex ";
+		plyTemplate += std::to_string(vertexNum);
+		plyTemplate += "\nproperty float x\nproperty float y\nproperty float z\nelement face 0";
+		plyTemplate += "\nproperty list uchar int vertex_indices\nend_header\n";
+
+		// Write header
+		fprintf(fs, plyTemplate.c_str());
+
+		// Write points
+		for (int y = 0; y < mapy; y++) {
+			for (int x = 0; x < mapx; x++) {
+				for (int f = 0; f < 3; f++) {
+					if (mapView(y, x) != 0) {
+						fprintf(fs, "%.4lf ", inputs(mapView(y, x) - 1, f));
+					}
+				}
+				if (mapView(y, x) != 0) {
+					fprintf(fs, "\n");
+				}
 			}
 		}
 
