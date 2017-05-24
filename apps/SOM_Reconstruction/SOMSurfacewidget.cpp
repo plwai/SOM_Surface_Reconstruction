@@ -544,7 +544,7 @@ namespace GPUMLib {
 		for (size_t z = 0; z < weights.DimZ(); z++) { // mapy
 			for (size_t y = 0; y < weights.DimY(); y++) { // mapx
 				for (size_t x = 0; x < weights.DimX(); x++) { // features
-					weights(x, y, z) = (cudafloat)rand() / maxScale;
+					weights(x, y, z) = (cudafloat)(rand() % maxScale);;
 				}
 			}
 		}
