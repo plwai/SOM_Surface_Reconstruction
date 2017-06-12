@@ -57,7 +57,8 @@ endif()
 #-------------------------------------------------
 option(BUILD_RAN_AND_RBF_NETWORKS "Build RAN and RBF networks (requires CULA)" ON)
 option(CULA_R17_OR_ABOVE "CULA version is R17 or above" ON)
-option(BUILD_SURFACE_RECONSTRUCTION_SOM "Build surface reconstruction function in SOM (required PCL)" ON)
+option(BUILD_SURFACE_RECONSTRUCTION_SOM "Build surface reconstruction function in SOM" ON)
+option(BUILD_PCL_VIEWER "Build viewer extension in surface reconstruction function in SOM" ON)
 
 set(ARCH_OPTIONS default 11 12 13 20 30 35 50 52)
 list(GET ARCH_OPTIONS 0 DEFAULT_ARCH)
@@ -194,23 +195,25 @@ endif()
 
 find_package( PCL 1.8 )
 
-if( PCL_FOUND AND BUILD_SURFACE_RECONSTRUCTION_SOM )
-  # [C/C++]>[General]>[Additional Include Directories]
-  include_directories( ${PCL_INCLUDE_DIRS} )
+if( PCL_FOUND AND BUILD_SURFACE_RECONSTRUCTION_SOM AND BUILD_PCL_VIEWER )
+	add_definitions(-DPCL_EXIST)
+	
+	# [C/C++]>[General]>[Additional Include Directories]
+	include_directories( ${PCL_INCLUDE_DIRS} )
 
-  # [C/C++]>[Preprocessor]>[Preprocessor Definitions]
-  add_definitions( ${PCL_DEFINITIONS} )
+	# [C/C++]>[Preprocessor]>[Preprocessor Definitions]
+	add_definitions( ${PCL_DEFINITIONS} )
 
-  # For Use Not PreCompiled Features
-  #add_definitions( -DPCL_NO_PRECOMPILE )
+	# For Use Not PreCompiled Features
+	#add_definitions( -DPCL_NO_PRECOMPILE )
 
-  # [Linker]>[General]>[Additional Library Directories]
-  link_directories( ${PCL_LIBRARY_DIRS} )
+	# [Linker]>[General]>[Additional Library Directories]
+	link_directories( ${PCL_LIBRARY_DIRS} )
 
-  # [Linker]>[Input]>[Additional Dependencies]
-  #target_link_libraries( SOM_Reconstruction ${PCL_LIBRARIES} )
+	# [Linker]>[Input]>[Additional Dependencies]
+	#target_link_libraries( SOM_Reconstruction ${PCL_LIBRARIES} )
 else()
-  message(WARNING "PCL not found. Surface reconstruction for SOM will not be build")
+	message(WARNING "PCL will not be built")
 endif()
 #-------------------------------------------------
 
@@ -615,29 +618,44 @@ function(build_apps)
 
 	build_qt_app(SOM "${libs_som}" "${files_som}")
 
-	if(PCL_FOUND AND BUILD_SURFACE_RECONSTRUCTION_SOM)
+	if(BUILD_SURFACE_RECONSTRUCTION_SOM)
 		# SOM_Reconstruction GUI app
 		qt5_add_resources(res_som_surface
 			src/apps/SOM_Reconstruction/SOMSurfaceresources.qrc
 		)
-
-		set (files_som_surface
-			src/apps/SOM_Reconstruction/main.cpp
-			src/apps/SOM_Reconstruction/SOMSurfacewidget.cpp
-			${res_som_surface}
-		)
-
-		# Build with PCL
-		set (libs_som_surface
-			gpumlib_cuda_som_surface
-			gpumlib_utils
-			gpumlib_gui
-			${PCL_LIBRARIES}
-		)
+		
+		if(PCL_FOUND AND BUILD_PCL_VIEWER)
+			set (files_som_surface
+				src/apps/SOM_Reconstruction/main.cpp
+				src/apps/SOM_Reconstruction/SOMSurfacewidget.cpp
+				src/apps/SOM_Reconstruction/SurfaceViewer.cpp
+				${res_som_surface}
+			)
+			
+			# Build with PCL
+			set (libs_som_surface
+				gpumlib_cuda_som_surface
+				gpumlib_utils
+				gpumlib_gui
+				${PCL_LIBRARIES}
+			)
+		else()
+			set (files_som_surface
+				src/apps/SOM_Reconstruction/main.cpp
+				src/apps/SOM_Reconstruction/SOMSurfacewidget.cpp
+				${res_som_surface}
+			)
+			
+			set (libs_som_surface
+				gpumlib_cuda_som_surface
+				gpumlib_utils
+				gpumlib_gui
+			)
+		endif()
 
 		build_qt_app(SOM_Reconstruction "${libs_som_surface}" "${files_som_surface}")
 	else()
-		message(WARNING "PCL not found. Cannot compile SOM for Surface Reconstruction.")
+		message(WARNING "Surface Reconstruction will not be built")
 	endif()
 
 	if (CSHARP_FOUND)

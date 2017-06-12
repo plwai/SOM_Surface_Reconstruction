@@ -43,9 +43,11 @@
 #include <cmath>
 #include <string>
 
-#include <pcl/common/common.h>
-#include <pcl/io/auto_io.h>
-#include <pcl/visualization/pcl_visualizer.h>
+#ifdef PCL_EXIST
+
+#include "SurfaceViewer.h"
+
+#endif
 
 #define GPUMLIB_SOM_INITIAL_LEARNING_RATE (cudafloat(0.5))
 #define WEIGHTS_OUTPUT_CPU "weights_cpu.txt"
@@ -277,19 +279,14 @@ namespace GPUMLib {
 
 		summaryLog.Append(log.ToString());
 
-		pcl::PolygonMesh mesh;
-		pcl::io::load(DeviceIsCPU() ? PLY_OUTPUT_CPU : PLY_OUTPUT_GPU, mesh);
+	#ifdef PCL_EXIST
 
-		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("3D Viewer"));
-		viewer->setBackgroundColor(0.8, 0.89, 1);
-		viewer->addPolygonMesh(mesh, "meshes", 0);
-		viewer->initCameraParameters();
-		viewer->setCameraPosition(RESCALE_MAX / 2, RESCALE_MAX / 2, RESCALE_MAX * -2, RESCALE_MAX / 2, RESCALE_MAX / 2, RESCALE_MAX / 2, 0.00586493, 0.998639, -0.0518208);
-
-		while (!viewer->wasStopped()){
-			viewer->spinOnce(100);
-			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
-		}
+		SurfaceViewer sv;
+		sv.initViewer(RESCALE_MAX);
+		sv.loadMesh(DeviceIsCPU() ? PLY_OUTPUT_CPU : PLY_OUTPUT_GPU);
+		sv.run();
+		
+	#endif
 	}
 
 	int SOMSurfacewidget::TrainCPU(ProgressInfo & progress, int iteration, CudaMatrix<cudafloat> & inputData, CudaArray<int> & targets, CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, CudaArray<int> & winNode, cudafloat mapRadius, cudafloat timeConstant, LogHTML & summaryLog, LogHTML & log, int & mapType) {
