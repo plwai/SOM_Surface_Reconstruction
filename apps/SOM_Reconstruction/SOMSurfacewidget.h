@@ -69,6 +69,8 @@ namespace GPUMLib {
 		void WritePLYFile(CudaMatrix3D<cudafloat> & weights, CudaMatrix<int> & mapView, int mapz, char * plyOutput);
 		void WriteLayerPLYFile(CudaMatrix<cudafloat> & inputs, CudaMatrix<int> & mapView, int mapz, char * plyOutput);
 
+		void WriteProcessedInputFile(CudaMatrix<cudafloat> & inputs, int vectors, char * outputFile);
+
 		int getMapLocation(int row, int col, int mapx);
 	};
 

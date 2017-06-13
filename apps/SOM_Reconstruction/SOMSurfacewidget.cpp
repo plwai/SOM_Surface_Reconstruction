@@ -59,6 +59,8 @@
 #define PLY_OUTPUT_CPU "3D_cpu.ply"
 #define PLY_OUTPUT_GPU "3D_gpu.ply"
 
+#define PROCESSED_FILE "processed_file.txt"
+
 namespace GPUMLib {
 
 	void SOMSurfacewidget::LogConfiguration(LogHTML & log, ParameterValues & parameterValues) {
@@ -196,6 +198,8 @@ namespace GPUMLib {
 			int vectors = dsTrain->NumberOfSamples();
 
 			CudaMatrix<cudafloat> inputs(dsTrain->GetInputs());
+
+			WriteProcessedInputFile(inputs, vectors, PROCESSED_FILE);
 
 			CudaArray<int> targets(vectors);
 			for (int i = 0; i < vectors; i++) targets[i] = (int)dsTrain->GetTargets()(i, 0);
@@ -726,6 +730,20 @@ namespace GPUMLib {
 				}
 			}
 		}
+
+		fclose(fs);
+	}
+
+	void SOMSurfacewidget::WriteProcessedInputFile(CudaMatrix<cudafloat> & inputs, int vectors , char * outputFile) {
+		FILE *fs = fopen(outputFile, "w");
+
+		for (int i = 0; i < vectors; i++) {
+			for (int f = 0; f < 3; f++) {
+				fprintf(fs, "%.4lf ", inputs(i, f));
+			}
+			fprintf(fs, "%d\n", i + 1);
+		}
+		
 
 		fclose(fs);
 	}
