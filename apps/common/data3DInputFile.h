@@ -53,4 +53,4 @@ namespace GPUMLib {
 
 } // namespace GPUMLib
 
-#endif // DATAINPUTFILE_H
+#endif // DATAINPUT3DFILE_H
