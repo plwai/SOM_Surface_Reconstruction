@@ -1,7 +1,7 @@
 # SOM Surface Reconstruction
 ## What is SOM Surface Reconstruction
 
-SOM Surface Reconstruction is the a developing SOM surface reconstruction extension in GPUMLib.
+SOM Surface Reconstruction is a developing SOM surface reconstruction extension in GPUMLib.
 
 ## Installation
 
